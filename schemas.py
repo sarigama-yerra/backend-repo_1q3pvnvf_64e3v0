@@ -1,48 +1,100 @@
 """
-Database Schemas
+Aayaan Hospital - Database Schemas
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model corresponds to a MongoDB collection (lowercased class name).
+We focus on core entities required by the hospital system.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List, Literal
+from datetime import datetime
 
-# Example schemas (replace with your own):
-
+# Users (doctors, nurses, patients, lab, pharmacy, admin)
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    role: Literal['doctor','nurse','patient','lab','pharmacy','admin']
+    full_name: str = Field(..., min_length=2)
+    email: EmailStr
+    password_hash: str
+    phone: Optional[str] = None
+    gender: Optional[Literal['male','female','other']] = None
+    date_of_birth: Optional[str] = None
+    address: Optional[str] = None
+    is_active: bool = True
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class Patient(BaseModel):
+    user_id: str
+    medical_record_number: str
+    blood_group: Optional[str] = None
+    allergies: Optional[List[str]] = None
+    chronic_conditions: Optional[List[str]] = None
+    emergency_contact: Optional[str] = None
+    insurance_provider: Optional[str] = None
+    insurance_number: Optional[str] = None
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Doctor(BaseModel):
+    user_id: str
+    specialization: Optional[str] = None
+    license_number: Optional[str] = None
+    years_of_experience: Optional[int] = None
+    schedule: Optional[List[dict]] = None  # [{day:'Mon', slots:["09:00-12:00"]}]
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Appointment(BaseModel):
+    patient_id: str
+    doctor_id: str
+    date: str
+    time: str
+    status: Literal['scheduled','completed','cancelled','no_show'] = 'scheduled'
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+
+class Prescription(BaseModel):
+    patient_id: str
+    doctor_id: str
+    items: List[dict]  # [{medicine_id, name, dosage, frequency, days, notes}]
+    issued_at: Optional[datetime] = None
+
+class LabTest(BaseModel):
+    patient_id: str
+    ordered_by: str  # doctor_id
+    test_type: str
+    status: Literal['ordered','in_progress','completed','cancelled'] = 'ordered'
+    result_summary: Optional[str] = None
+    result_pdf_url: Optional[str] = None
+
+class Medicine(BaseModel):
+    name: str
+    stock: int
+    price: float
+    manufacturer: Optional[str] = None
+    expiry_date: Optional[str] = None
+
+class Dispense(BaseModel):
+    patient_id: str
+    prescription_id: str
+    items: List[dict]  # [{medicine_id, quantity, price}]
+    total: float
+    paid: bool = False
+
+class Admission(BaseModel):
+    patient_id: str
+    room_number: str
+    bed_number: Optional[str] = None
+    admitted_at: str
+    discharge_at: Optional[str] = None
+    status: Literal['admitted','discharged'] = 'admitted'
+
+class Payment(BaseModel):
+    patient_id: str
+    amount: float
+    method: Literal['cash','card','insurance']
+    invoice_number: str
+    insurance_provider: Optional[str] = None
+    status: Literal['pending','paid','failed'] = 'pending'
+
+class AmbulanceRequest(BaseModel):
+    patient_name: str
+    phone: str
+    location: str
+    destination: Optional[str] = None
+    eta_minutes: Optional[int] = None
+    status: Literal['requested','enroute','arrived','cancelled'] = 'requested'
